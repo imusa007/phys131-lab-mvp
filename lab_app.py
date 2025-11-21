@@ -23,29 +23,23 @@ def create_lab_pdf(
     """
     Build a PDF in memory and return its bytes.
     """
-    pdf = FPDF()
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_margins(15, 15, 15)
     pdf.add_page()
-
+    
+    # Use Unicode-safe font
+    pdf.add_font("DejaVu", "", fname="DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 14)
+    
     # Title
-    pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 10, lab_title, ln=True, align="C")
+    
     pdf.ln(5)
-
-    # Basic info
-    pdf.set_font("Helvetica", "", 11)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+    pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, f"Student Name: {student_name or 'N/A'}")
     pdf.multi_cell(0, 6, f"Section: {section or 'N/A'}")
-    pdf.multi_cell(0, 6, f"Generated: {timestamp}")
-    pdf.ln(5)
 
-    # Objective
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Objective", ln=True)
-    pdf.set_font("Helvetica", "", 11)
-    pdf.multi_cell(0, 6, objective or "N/A")
-    pdf.ln(3)
 
     # Data Table
     pdf.set_font("Helvetica", "B", 12)
