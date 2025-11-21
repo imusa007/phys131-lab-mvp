@@ -99,7 +99,7 @@ def create_lab_pdf(
     pdf.set_font("DejaVu", "", 11)
     safe_multicell(pdf, conclusion or "N/A")
 
-    return pdf.output(dest="S").encode("latin1")
+    return bytes(pdf.output(dest="S"))
 
 # ======================================================
 # Streamlit App
