@@ -105,7 +105,7 @@ def create_lab_pdf(
 def main():
     st.set_page_config(page_title="Physics Lab Report v0.1 beta", page_icon="🧪")
 
-    st.title("🧪 Physics Lab Report Generator")
+    st.title("🧪 Physics Lab Report Generator v0.1 beta")
     st.write(
         "Fill out the fields below. When you are done, click **Generate PDF report** "
         "and upload the PDF to Blackboard."
