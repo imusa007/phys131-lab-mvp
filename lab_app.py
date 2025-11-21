@@ -1,103 +1,90 @@
-# lab_app.py
-
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
 from fpdf import FPDF
-from io import BytesIO
-from datetime import datetime
 import tempfile
 
-# --------- PDF helper --------- #
-
 def create_lab_pdf(
-    student_name: str,
-    section: str,
-    lab_title: str,
-    objective: str,
-    data_df: pd.DataFrame,
-    analysis: str,
-    conclusion: str,
-    fig_buf: BytesIO | None,
-) -> bytes:
+    student_name,
+    section,
+    lab_title,
+    objective,
+    data_df,
+    analysis,
+    conclusion,
+    fig_buf,
+):
     """
-    Build a PDF in memory and return its bytes.
+    Create a PDF using fpdf2 with full Unicode support.
+    This version avoids all 'Not enough space to render a character' errors.
     """
+
+    # --- Create PDF ---
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_margins(15, 15, 15)
     pdf.add_page()
-    
-    # Use Unicode-safe font
-    pdf.add_font("DejaVu", "", fname="DejaVuSans.ttf", uni=True)
+
+    # --- Use Unicode font ---
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
     pdf.set_font("DejaVu", "", 14)
-    
-    # Title
+
+    # --- Title ---
     pdf.cell(0, 10, lab_title, ln=True, align="C")
-    
     pdf.ln(5)
+
     pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, f"Student Name: {student_name or 'N/A'}")
     pdf.multi_cell(0, 6, f"Section: {section or 'N/A'}")
+    pdf.multi_cell(0, 6, f"Objective:\n{objective}")
+    pdf.ln(4)
 
-
-    # Data Table
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Data", ln=True)
-    pdf.set_font("Helvetica", "", 10)
+    # --- Data Table ---
+    pdf.set_font("DejaVu", "", 12)
+    pdf.cell(0, 8, "Data Table", ln=True)
+    pdf.set_font("DejaVu", "", 10)
 
     if not data_df.empty:
-        # Simple text table
-        col_widths = [pdf.get_string_width(str(c)) + 4 for c in data_df.columns]
-        max_col_width = 40
-        col_widths = [min(w, max_col_width) for w in col_widths]
-
-        # Header row
-        for i, col in enumerate(data_df.columns):
-            pdf.cell(col_widths[i], 7, str(col), border=1)
+        col_width = 40
+        # header
+        for col in data_df.columns:
+            pdf.cell(col_width, 8, str(col), border=1)
         pdf.ln()
 
-        # Data rows
+        # rows
         for _, row in data_df.iterrows():
-            for i, col in enumerate(data_df.columns):
-                text = str(row[col])
-                pdf.cell(col_widths[i], 7, text, border=1)
+            for col in data_df.columns:
+                pdf.cell(col_width, 8, str(row[col]), border=1)
             pdf.ln()
     else:
         pdf.multi_cell(0, 6, "No data entered.")
     pdf.ln(5)
 
-    # Plot (if provided)
+    # --- Plot ---
     if fig_buf is not None:
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 8, "Graph", ln=True)
+        pdf.set_font("DejaVu", "", 12)
+        pdf.cell(0, 8, "Plot", ln=True)
         pdf.ln(2)
 
-        # Save buffer temporarily so FPDF can load it
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(fig_buf.getvalue())
-            tmp_path = tmp.name
+            img_path = tmp.name
 
-        # Width 170 mm (roughly full page width minus margins)
-        pdf.image(tmp_path, w=170)
+        pdf.image(img_path, w=170)
         pdf.ln(5)
 
-    # Analysis
-    pdf.set_font("Helvetica", "B", 12)
+    # --- Analysis ---
+    pdf.set_font("DejaVu", "", 12)
     pdf.cell(0, 8, "Analysis", ln=True)
-    pdf.set_font("Helvetica", "", 11)
+    pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, analysis or "N/A")
-    pdf.ln(3)
+    pdf.ln(5)
 
-    # Conclusion
-    pdf.set_font("Helvetica", "B", 12)
+    # --- Conclusion ---
+    pdf.set_font("DejaVu", "", 12)
     pdf.cell(0, 8, "Conclusion", ln=True)
-    pdf.set_font("Helvetica", "", 11)
+    pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, conclusion or "N/A")
 
-    # Export to bytes
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    return pdf_bytes
+    # --- Return PDF bytes ---
+    return pdf.output(dest="S").encode("latin1")
 
 
 # --------- Streamlit app --------- #
