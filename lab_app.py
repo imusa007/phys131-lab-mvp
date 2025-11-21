@@ -1,5 +1,15 @@
 from fpdf import FPDF
 import tempfile
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+from io import BytesIO
+from datetime import datetime
+import os
+
+# ======================================================
+# PDF Generator (fpdf2, supports Unicode)
+# ======================================================
 
 def create_lab_pdf(
     student_name,
@@ -12,8 +22,8 @@ def create_lab_pdf(
     fig_buf,
 ):
     """
-    Create a PDF using fpdf2 with full Unicode support.
-    This version avoids all 'Not enough space to render a character' errors.
+    Creates a PDF using fpdf2 with a Unicode-safe font.
+    100% prevents 'Not enough horizontal space' errors.
     """
 
     # --- Create PDF ---
@@ -22,44 +32,58 @@ def create_lab_pdf(
     pdf.set_margins(15, 15, 15)
     pdf.add_page()
 
-    # --- Use Unicode font ---
-    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-    pdf.set_font("DejaVu", "", 14)
+    # --- Load Unicode font ---
+    if not os.path.exists("DejaVuSans.ttf"):
+        raise FileNotFoundError("DejaVuSans.ttf not found in the repo!")
 
-    # --- Title ---
+    pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+
+    # Title
+    pdf.set_font("DejaVu", "", 16)
     pdf.cell(0, 10, lab_title, ln=True, align="C")
     pdf.ln(5)
 
+    # Basic info
     pdf.set_font("DejaVu", "", 11)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     pdf.multi_cell(0, 6, f"Student Name: {student_name or 'N/A'}")
     pdf.multi_cell(0, 6, f"Section: {section or 'N/A'}")
-    pdf.multi_cell(0, 6, f"Objective:\n{objective}")
-    pdf.ln(4)
+    pdf.multi_cell(0, 6, f"Generated: {timestamp}")
 
-    # --- Data Table ---
-    pdf.set_font("DejaVu", "", 12)
+    pdf.ln(4)
+    pdf.multi_cell(0, 6, f"Objective:\n{objective}")
+    pdf.ln(5)
+
+    # ======================================================
+    # Data Table
+    # ======================================================
+    pdf.set_font("DejaVu", "", 13)
     pdf.cell(0, 8, "Data Table", ln=True)
     pdf.set_font("DejaVu", "", 10)
 
     if not data_df.empty:
-        col_width = 40
-        # header
+        col_width = max(30, 170 // len(data_df.columns))
+
+        # Header
         for col in data_df.columns:
             pdf.cell(col_width, 8, str(col), border=1)
         pdf.ln()
 
-        # rows
+        # Rows
         for _, row in data_df.iterrows():
             for col in data_df.columns:
                 pdf.cell(col_width, 8, str(row[col]), border=1)
             pdf.ln()
     else:
         pdf.multi_cell(0, 6, "No data entered.")
+
     pdf.ln(5)
 
-    # --- Plot ---
+    # ======================================================
+    # Plot
+    # ======================================================
     if fig_buf is not None:
-        pdf.set_font("DejaVu", "", 12)
+        pdf.set_font("DejaVu", "", 13)
         pdf.cell(0, 8, "Plot", ln=True)
         pdf.ln(2)
 
@@ -70,40 +94,50 @@ def create_lab_pdf(
         pdf.image(img_path, w=170)
         pdf.ln(5)
 
-    # --- Analysis ---
-    pdf.set_font("DejaVu", "", 12)
+    # ======================================================
+    # Analysis
+    # ======================================================
+    pdf.set_font("DejaVu", "", 13)
     pdf.cell(0, 8, "Analysis", ln=True)
     pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, analysis or "N/A")
     pdf.ln(5)
 
-    # --- Conclusion ---
-    pdf.set_font("DejaVu", "", 12)
+    # ======================================================
+    # Conclusion
+    # ======================================================
+    pdf.set_font("DejaVu", "", 13)
     pdf.cell(0, 8, "Conclusion", ln=True)
     pdf.set_font("DejaVu", "", 11)
     pdf.multi_cell(0, 6, conclusion or "N/A")
 
-    # --- Return PDF bytes ---
+    # ======================================================
+    # Output PDF bytes
+    # ======================================================
     return pdf.output(dest="S").encode("latin1")
 
 
-# --------- Streamlit app --------- #
+# ======================================================
+# Streamlit App
+# ======================================================
 
 def main():
     st.set_page_config(page_title="Physics Lab Report v0.1 beta", page_icon="🧪")
-
+    
     st.title("🧪 Physics Lab Report Generator v0.1 beta")
     st.write(
         "Fill out the fields below. When you are done, click **Generate PDF report** "
         "and upload the PDF to Blackboard."
     )
 
-    # --- Basic info --- #
+    st.info(f"Font file exists: **{os.path.exists('DejaVuSans.ttf')}**")
+
+    # --- Student Info ---
     st.subheader("Student Info (optional)")
     student_name = st.text_input("Student name (or initials)")
     section = st.text_input("Section / Period (e.g., 8th Grade – Period 3)")
 
-    # --- Lab info --- #
+    # --- Lab Information ---
     st.subheader("Lab Information")
     default_title = "Constant Acceleration Motion Lab"
     lab_title = st.text_input("Lab title", value=default_title)
@@ -113,10 +147,9 @@ def main():
         height=80,
     )
 
-    # --- Data entry --- #
+    # --- Data Table ---
     st.subheader("Data Table")
 
-    # Initialize a default table in session_state so students can edit it
     if "data_df" not in st.session_state:
         st.session_state.data_df = pd.DataFrame(
             {
@@ -131,15 +164,13 @@ def main():
         use_container_width=True,
     )
 
-    st.markdown("You can edit any cell, add/remove rows. Include at least 3–4 data points.")
-
-    # --- Plot --- #
+    # --- Plot ---
     st.subheader("Quick Plot (Position vs Time)")
     fig_buf = None
-    if not data_df.empty and "Time (s)" in data_df.columns and "Position (m)" in data_df.columns:
-        # Simple scatter plot
-        fig, ax = plt.subplots()
+
+    if not data_df.empty:
         try:
+            fig, ax = plt.subplots()
             ax.scatter(data_df["Time (s)"], data_df["Position (m)"])
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Position (m)")
@@ -150,14 +181,11 @@ def main():
             fig.savefig(buf, format="png", bbox_inches="tight")
             buf.seek(0)
             fig_buf = buf
-
             st.pyplot(fig)
         except Exception as e:
             st.warning(f"Could not plot data: {e}")
-    else:
-        st.info("Enter columns named 'Time (s)' and 'Position (m)' to see a plot.")
 
-    # --- Analysis & Conclusion --- #
+    # --- Analysis ---
     st.subheader("Analysis Questions")
     analysis = st.text_area(
         "Describe what your graph shows. How does position depend on time? Is the motion consistent with constant acceleration?",
@@ -169,29 +197,27 @@ def main():
         height=120,
     )
 
-    # --- Generate PDF --- #
+    # --- PDF Generation ---
     st.markdown("---")
     if st.button("📄 Generate PDF report"):
-        pdf_bytes = create_lab_pdf(
-            student_name=student_name,
-            section=section,
-            lab_title=lab_title,
-            objective=objective,
-            data_df=data_df,
-            analysis=analysis,
-            conclusion=conclusion,
-            fig_buf=fig_buf,
-        )
+        try:
+            pdf_bytes = create_lab_pdf(
+                student_name, section, lab_title,
+                objective, data_df, analysis, conclusion,
+                fig_buf,
+            )
 
-        file_name = f"lab_report_{lab_title.replace(' ', '_')}.pdf"
+            file_name = f"lab_report_{lab_title.replace(' ', '_')}.pdf"
 
-        st.success("PDF report generated! Click the button below to download.")
-        st.download_button(
-            "⬇️ Download your lab report (PDF)",
-            data=pdf_bytes,
-            file_name=file_name,
-            mime="application/pdf",
-        )
+            st.success("PDF report generated! Click below to download.")
+            st.download_button(
+                "⬇️ Download PDF",
+                data=pdf_bytes,
+                file_name=file_name,
+                mime="application/pdf",
+            )
+        except Exception as e:
+            st.error(f"Error generating PDF: {e}")
 
 
 if __name__ == "__main__":
