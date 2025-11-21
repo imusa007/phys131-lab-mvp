@@ -103,7 +103,7 @@ def create_lab_pdf(
 # --------- Streamlit app --------- #
 
 def main():
-    st.set_page_config(page_title="Physics Lab Report", page_icon="🧪")
+    st.set_page_config(page_title="Physics Lab Report v0.1 beta", page_icon="🧪")
 
     st.title("🧪 Physics Lab Report Generator")
     st.write(
