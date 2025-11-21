@@ -10,6 +10,10 @@ import os
 # ======================================================
 # PDF Generator (fpdf2, supports Unicode)
 # ======================================================
+def safe_multicell(pdf, text, h=6):
+    """Safe multi-cell that never throws width errors."""
+    line_width = pdf.w - pdf.l_margin - pdf.r_margin
+    pdf.multi_cell(line_width, h, text)
 
 def create_lab_pdf(
     student_name,
@@ -21,48 +25,38 @@ def create_lab_pdf(
     conclusion,
     fig_buf,
 ):
-    """
-    Creates a PDF using fpdf2 with a Unicode-safe font.
-    100% prevents 'Not enough horizontal space' errors.
-    """
-
-    # --- Create PDF ---
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_margins(15, 15, 15)
     pdf.add_page()
 
-    # --- Load Unicode font ---
-    if not os.path.exists("DejaVuSans.ttf"):
-        raise FileNotFoundError("DejaVuSans.ttf not found in the repo!")
-
+    # Load Unicode font
     pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+    pdf.set_font("DejaVu", "", 16)
 
     # Title
-    pdf.set_font("DejaVu", "", 16)
-    pdf.cell(0, 10, lab_title, ln=True, align="C")
-    pdf.ln(5)
+    safe_multicell(pdf, lab_title)
+    pdf.ln(3)
 
-    # Basic info
     pdf.set_font("DejaVu", "", 11)
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-    pdf.multi_cell(0, 6, f"Student Name: {student_name or 'N/A'}")
-    pdf.multi_cell(0, 6, f"Section: {section or 'N/A'}")
-    pdf.multi_cell(0, 6, f"Generated: {timestamp}")
+    safe_multicell(pdf, f"Student Name: {student_name or 'N/A'}")
+    safe_multicell(pdf, f"Section: {section or 'N/A'}")
+    safe_multicell(pdf, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-    pdf.ln(4)
-    pdf.multi_cell(0, 6, f"Objective:\n{objective}")
+    pdf.ln(3)
+    safe_multicell(pdf, f"Objective:\n{objective}")
     pdf.ln(5)
 
-    # ======================================================
     # Data Table
-    # ======================================================
-    pdf.set_font("DejaVu", "", 13)
-    pdf.cell(0, 8, "Data Table", ln=True)
+    pdf.set_font("DejaVu", "", 12)
+    safe_multicell(pdf, "Data Table")
+    pdf.ln(1)
+
     pdf.set_font("DejaVu", "", 10)
 
     if not data_df.empty:
-        col_width = max(30, 170 // len(data_df.columns))
+        col_count = len(data_df.columns)
+        col_width = (pdf.w - pdf.l_margin - pdf.r_margin) / col_count
 
         # Header
         for col in data_df.columns:
@@ -75,17 +69,15 @@ def create_lab_pdf(
                 pdf.cell(col_width, 8, str(row[col]), border=1)
             pdf.ln()
     else:
-        pdf.multi_cell(0, 6, "No data entered.")
+        safe_multicell(pdf, "No data entered.")
 
     pdf.ln(5)
 
-    # ======================================================
     # Plot
-    # ======================================================
     if fig_buf is not None:
-        pdf.set_font("DejaVu", "", 13)
-        pdf.cell(0, 8, "Plot", ln=True)
-        pdf.ln(2)
+        pdf.set_font("DejaVu", "", 12)
+        safe_multicell(pdf, "Plot")
+        pdf.ln(1)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
             tmp.write(fig_buf.getvalue())
@@ -94,28 +86,20 @@ def create_lab_pdf(
         pdf.image(img_path, w=170)
         pdf.ln(5)
 
-    # ======================================================
     # Analysis
-    # ======================================================
-    pdf.set_font("DejaVu", "", 13)
-    pdf.cell(0, 8, "Analysis", ln=True)
+    pdf.set_font("DejaVu", "", 12)
+    safe_multicell(pdf, "Analysis")
     pdf.set_font("DejaVu", "", 11)
-    pdf.multi_cell(0, 6, analysis or "N/A")
+    safe_multicell(pdf, analysis or "N/A")
     pdf.ln(5)
 
-    # ======================================================
     # Conclusion
-    # ======================================================
-    pdf.set_font("DejaVu", "", 13)
-    pdf.cell(0, 8, "Conclusion", ln=True)
+    pdf.set_font("DejaVu", "", 12)
+    safe_multicell(pdf, "Conclusion")
     pdf.set_font("DejaVu", "", 11)
-    pdf.multi_cell(0, 6, conclusion or "N/A")
+    safe_multicell(pdf, conclusion or "N/A")
 
-    # ======================================================
-    # Output PDF bytes
-    # ======================================================
     return pdf.output(dest="S").encode("latin1")
-
 
 # ======================================================
 # Streamlit App
